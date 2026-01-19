@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Split & Voice Modulator</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" xintegrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <!-- Inter font for better aesthetics -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #212529; /* Dark background */
+            color: #f8f9fa; /* Light text */
+        }
+        .container {
+            max-width: 960px;
+        }
+        .card {
+            background-color: #343a40; /* Darker card background */
+            border: none;
+            border-radius: 0.5rem;
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        }
+        .form-control, .form-select {
+            background-color: #495057;
+            color: #f8f9fa;
+            border-color: #6c757d;
+        }
+        .form-control:focus, .form-select:focus {
+            background-color: #495057;
+            color: #f8f9fa;
+            border-color: #86b7fe;
+            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+        }
+        .btn-primary {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+        }
+        .btn-primary:hover {
+            background-color: #0b5ed7;
+            border-color: #0a58ca;
+        }
+        .progress-bar {
+            background-color: #198754; /* Green for success/progress */
+        }
+        .list-group-item {
+            background-color: #495057;
+            border-color: #6c757d;
+            color: #f8f9fa;
+        }
+        .alert-danger {
+            background-color: #dc3545;
+            color: #fff;
+        }
+        .alert-success {
+            background-color: #28a745;
+            color: #fff;
+        }
+        .logo-preview-container, .thumbnail-container {
+            background-color: #495057;
+            padding: 10px;
+            border-radius: 0.25rem;
+        }
+        .logo-preview-container img, .thumbnail-container img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 0.25rem;
+        }
+        .video-player-container {
+            width: 100%;
+            padding-bottom: 56.25%; /* 16:9 Aspect Ratio - default. Will be overridden for portrait. */
+            position: relative;
+            margin-bottom: 1rem;
+            background-color: black;
+            border-radius: 0.25rem;
+        }
+        .video-player-container video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 0.25rem;
+        }
+        /* Style for portrait videos within the player */
+        .video-player-container.portrait-aspect {
+            padding-bottom: 177.77%; /* 9:16 Aspect Ratio */
+        }
+    </style>
+</head>
+<body class="d-flex flex-column min-vh-100">
+    <div class="container my-5 flex-grow-1">
+        <h1 class="text-center mb-4 text-primary">Video Split & Voice Modulator</h1>
+
+        <div class="card p-4 mb-4">
+            <h2 class="h4 mb-3 text-info">Upload Video & Settings</h2>
+
+            <!-- Status Message Display -->
+            <div id="statusMessage" class="alert d-none" role="alert"></div>
+
+            <div class="mb-3">
+                <label for="videoFile" class="form-label">Upload Video File:</label>
+                <input class="form-control" type="file" id="videoFile" accept="video/*">
+                <div class="form-text text-muted">Max file size: 1GB (due to server-side limitations)</div>
+            </div>
+
+            <div id="videoPreviewContainer" class="mb-3 d-none">
+                <h3 class="h5 mb-2 text-info">Video Preview:</h3>
+                <video id="videoPreview" controls class="w-100 rounded"></video>
+            </div>
+
+            <div class="mb-3">
+                <label for="clipDuration" class="form-label">Clip Duration (seconds):</label>
+                <input type="number" class="form-control" id="clipDuration" value="30" min="1">
+            </div>
+
+            <div class="mb-3">
+                <label for="modulationEffect" class="form-label">Voice Modulation Effect:</label>
+                <select class="form-select" id="modulationEffect">
+                    <option value="none">No effect (original audio)</option>
+                    <option value="pitch_up">Pitch Up</option>
+                    <option value="pitch_down">Pitch Down</option>
+                    <option value="robot">Robot effect</option>
+                </select>
+            </div>
+
+            <!-- New: Output Orientation -->
+            <div class="mb-3">
+                <label for="outputOrientation" class="form-label">Output Orientation:</label>
+                <select class="form-select" id="outputOrientation">
+                    <option value="original">Original (Preserve Input Orientation)</option>
+                    <option value="portrait">Portrait (Add Black Bars to Landscape)</option>
+                </select>
+            </div>
+
+
+            <div class="mb-4 border-top border-secondary pt-3">
+                <h3 class="h5 mb-3 text-info">Add Your Logo (Optional)</h3>
+                <div class="mb-3">
+                    <label for="logoFile" class="form-label">Upload Logo Image (PNG recommended):</label>
+                    <input class="form-control" type="file" id="logoFile" accept="image/*">
+                </div>
+                <div id="logoPreviewContainer" class="logo-preview-container mb-3 d-none">
+                    <h5 class="mb-2">Logo Preview:</h5>
+                    <img id="logoPreview" src="#" alt="Logo Preview" class="img-fluid">
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="logoX" class="form-label">Logo X Position (%): <span id="logoXValue">10</span></label>
+                        <input type="range" class="form-range" id="logoX" min="0" max="90" value="10">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="logoY" class="form-label">Logo Y Position (%): <span id="logoYValue">10</span></label>
+                        <input type="range" class="form-range" id="logoY" min="0" max="90" value="10">
+                    </div>
+                    <div class="col-12">
+                        <label for="logoSize" class="form-label">Logo Size (% Video Width): <span id="logoSizeValue">20</span></label>
+                        <input type="range" class="form-range" id="logoSize" min="5" max="50" value="20">
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-4 border-top border-secondary pt-3">
+                <h3 class="h5 mb-3 text-info">Add Text Overlays (Optional)</h3>
+                <div class="mb-3">
+                    <label for="textOverlay" class="form-label">Text to Overlay:</label>
+                    <input type="text" class="form-control" id="textOverlay" placeholder="e.g., 'Check out this tip!'">
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label for="textColor" class="form-label">Text Color:</label>
+                        <input type="color" class="form-control form-control-color" id="textColor" value="#FFFFFF">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="fontSize" class="form-label">Font Size (% Video Height): <span id="fontSizeValue">5</span></label>
+                        <input type="range" class="form-range" id="fontSize" min="1" max="20" value="5">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label for="fontFamily" class="form-label">Font Family (System Font, e.g., Arial, 'Times New Roman', Inter):</label>
+                    <input type="text" class="form-control" id="fontFamily" value="Times New Roman" placeholder="e.g., Arial, 'Times New Roman', Inter">
+                </div>
+            </div>
+
+            <button id="startProcessingBtn" class="btn btn-primary btn-lg w-100 mb-3">
+                Start Processing
+            </button>
+            <div id="processingProgressBar" class="progress d-none">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+            <p id="processingStatus" class="text-center mt-2 d-none text-muted"></p>
+        </div>
+
+        <!-- Processed Clips Section -->
+        <div id="processedClipsSection" class="card p-4 mb-4 d-none">
+            <h2 class="h4 mb-3 text-info">Processed Clips</h2>
+            <div id="clipsContainer" class="row row-cols-1 row-cols-md-2 g-4">
+                <!-- Clips will be inserted here by JavaScript -->
+            </div>
+        </div>
+
+        <!-- Clip Captions Section -->
+        <div id="captionsSection" class="card p-4 mb-4 d-none">
+            <h2 class="h4 mb-3 text-info">Clip Captions</h2>
+            <div id="captionsContainer">
+                <!-- Captions will be inserted here by JavaScript -->
+            </div>
+            <div class="d-grid gap-2 d-md-flex justify-content-md-start mt-4">
+                <button id="downloadCaptionsTxt" class="btn btn-success">Download Captions (TXT)</button>
+                <button id="downloadCaptionsCsv" class="btn btn-success">Download Captions (CSV)</button>
+            </div>
+        </div>
+
+        <!-- Logs Section -->
+        <div class="card p-4">
+            <h2 class="h4 mb-3 text-info">Logs</h2>
+            <div id="logsContainer" class="bg-dark p-3 rounded" style="max-height: 200px; overflow-y: scroll; font-family: monospace; font-size: 0.85rem;">
+                <!-- Logs will appear here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS (optional, for components like dropdowns/modals) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" xintegrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <!-- FileSaver.js for client-side file downloads (used for captions) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+    <script>
+        // DOM Elements
+        const videoFile = document.getElementById('videoFile');
+        const videoPreviewContainer = document.getElementById('videoPreviewContainer');
+        const videoPreview = document.getElementById('videoPreview');
+        const clipDurationInput = document.getElementById('clipDuration');
+        const modulationEffectSelect = document.getElementById('modulationEffect');
+        const outputOrientationSelect = document.getElementById('outputOrientation'); // New element
+        const logoFile = document.getElementById('logoFile');
+        const logoPreviewContainer = document.getElementById('logoPreviewContainer');
+        const logoPreview = document.getElementById('logoPreview');
+        const logoX = document.getElementById('logoX');
+        const logoY = document.getElementById('logoY');
+        const logoSize = document.getElementById('logoSize');
+        const logoXValue = document.getElementById('logoXValue');
+        const logoYValue = document.getElementById('logoYValue');
+        const logoSizeValue = document.getElementById('logoSizeValue');
+        const textOverlayInput = document.getElementById('textOverlay');
+        const textColorInput = document.getElementById('textColor');
+        const fontSizeInput = document.getElementById('fontSize');
+        const fontSizeValue = document.getElementById('fontSizeValue');
+        const fontFamilyInput = document.getElementById('fontFamily');
+        const startProcessingBtn = document.getElementById('startProcessingBtn');
+        const statusMessageDiv = document.getElementById('statusMessage');
+        const processingProgressBar = document.getElementById('processingProgressBar');
+        const progressBarInner = processingProgressBar.querySelector('.progress-bar');
+        const processingStatus = document.getElementById('processingStatus');
+        const logsContainer = document.getElementById('logsContainer');
+        const processedClipsSection = document.getElementById('processedClipsSection');
+        const clipsContainer = document.getElementById('clipsContainer');
+        const captionsSection = document.getElementById('captionsSection');
+        const captionsContainer = document.getElementById('captionsContainer');
+        const downloadCaptionsTxtBtn = document.getElementById('downloadCaptionsTxt');
+        const downloadCaptionsCsvBtn = document.getElementById('downloadCaptionsCsv');
+
+        // State variables (similar to React useState)
+        let _videoFile = null;
+        let _logoFile = null;
+        let _clipDuration = 30;
+        let _modulationEffect = 'none';
+        let _outputOrientation = 'original'; // New state variable
+        let _logoPosition = { x: 10, y: 10 };
+        let _logoSize = 20;
+        let _textOverlay = '';
+        let _textColor = '#FFFFFF';
+        let _fontSize = 5;
+        let _fontFamily = 'Inter';
+        let _isProcessing = false;
+        let _logs = []; // Frontend-generated logs
+        let _downloadableClips = [];
+        let _captions = {};
+
+        const backendUrl = 'http://localhost:3001'; // Your Node.js server address
+
+        // Utility functions
+        const updateLog = (message, clear = false) => {
+            if (clear) {
+                logsContainer.innerHTML = '';
+                _logs = [];
+            }
+            const p = document.createElement('p');
+            p.textContent = message;
+            logsContainer.appendChild(p);
+            logsContainer.scrollTop = logsContainer.scrollHeight; // Auto-scroll to bottom
+            _logs.push(message); // Keep track of logs
+        };
+
+        const updateStatusMessage = (message, type = 'info') => {
+            statusMessageDiv.textContent = message;
+            statusMessageDiv.className = `alert mt-3 ${type === 'error' ? 'alert-danger' : 'alert-success'}`;
+            statusMessageDiv.classList.remove('d-none');
+        };
+
+        const setProcessingState = (processing) => {
+            _isProcessing = processing;
+            startProcessingBtn.disabled = processing || !_videoFile;
+            if (processing) {
+                startProcessingBtn.textContent = 'Processing...';
+                processingProgressBar.classList.remove('d-none');
+                processingStatus.classList.remove('d-none');
+            } else {
+                startProcessingBtn.textContent = 'Start Processing';
+                processingProgressBar.classList.add('d-none');
+                processingStatus.classList.add('d-none');
+                progressBarInner.style.width = '0%';
+                progressBarInner.setAttribute('aria-valuenow', 0);
+            }
+        };
+
+        const updateProgressBar = (percentage, message) => {
+            // Ensure percentage is clamped between 0 and 100
+            percentage = Math.max(0, Math.min(100, percentage));
+            progressBarInner.style.width = `${percentage}%`;
+            progressBarInner.setAttribute('aria-valuenow', percentage);
+            processingStatus.textContent = message;
+        };
+
+        const renderDownloadableClips = () => {
+            clipsContainer.innerHTML = ''; // Clear previous clips
+            if (_downloadableClips.length > 0) {
+                processedClipsSection.classList.remove('d-none');
+                _downloadableClips.forEach(clip => {
+                    const col = document.createElement('div');
+                    col.className = 'col-12 col-md-6'; // Adjust column size for better layout
+
+                    const clipCard = document.createElement('div');
+                    clipCard.className = 'card h-100 p-3';
+
+                    const title = document.createElement('h5');
+                    title.className = 'card-title text-info mb-2';
+                    title.textContent = `Clip ${clip.clipIndex}`;
+                    clipCard.appendChild(title);
+
+                    // Add a video player for direct playback
+                    const videoPlayerContainer = document.createElement('div');
+                    // Add class for portrait aspect ratio if applicable
+                    if (_outputOrientation === 'portrait' && videoPreview.videoWidth > videoPreview.videoHeight) {
+                         videoPlayerContainer.classList.add('portrait-aspect');
+                    }
+                    videoPlayerContainer.className += ' video-player-container';
+
+
+                    const videoElement = document.createElement('video');
+                    videoElement.controls = true;
+                    videoElement.src = clip.blobUrl; // This is the direct URL from backend
+                    videoElement.className = 'w-100 rounded';
+                    videoPlayerContainer.appendChild(videoElement);
+                    clipCard.appendChild(videoPlayerContainer);
+
+                    // Add thumbnail below the video (optional, but good for quick glance)
+                    if (clip.thumbnailUrl) {
+                        const thumbnailDiv = document.createElement('div');
+                        thumbnailDiv.className = 'thumbnail-container mb-2';
+                        const thumbnailImg = document.createElement('img');
+                        thumbnailImg.src = clip.thumbnailUrl;
+                        thumbnailImg.alt = `Thumbnail for Clip ${clip.clipIndex}`;
+                        thumbnailImg.className = 'img-fluid rounded';
+                        thumbnailDiv.appendChild(thumbnailImg);
+                        clipCard.appendChild(thumbnailDiv);
+                    }
+
+                    const fileNameP = document.createElement('p');
+                    fileNameP.className = 'card-text text-muted mb-2';
+                    fileNameP.textContent = `File: ${clip.fileName}`;
+                    clipCard.appendChild(fileNameP);
+
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = clip.blobUrl;
+                    downloadLink.download = clip.fileName; // This attribute forces download
+                    downloadLink.className = 'btn btn-success btn-sm w-100';
+                    downloadLink.textContent = 'Download Clip';
+                    clipCard.appendChild(downloadLink);
+
+                    col.appendChild(clipCard);
+                    clipsContainer.appendChild(col);
+                });
+            } else {
+                processedClipsSection.classList.add('d-none');
+            }
+        };
+
+        const renderCaptions = () => {
+            captionsContainer.innerHTML = '';
+            if (Object.keys(_captions).length > 0) {
+                captionsSection.classList.remove('d-none');
+                Object.entries(_captions)
+                    .sort(([a], [b]) => parseInt(a) - parseInt(b))
+                    .forEach(([index, text]) => {
+                        const div = document.createElement('div');
+                        div.className = 'mb-3';
+
+                        const label = document.createElement('label');
+                        label.className = 'form-label text-muted';
+                        label.htmlFor = `caption-${index}`;
+                        label.textContent = `Clip ${index} Caption:`;
+                        div.appendChild(label);
+
+                        const textarea = document.createElement('textarea');
+                        textarea.id = `caption-${index}`;
+                        textarea.className = 'form-control';
+                        textarea.rows = '2';
+                        textarea.value = text;
+                        textarea.placeholder = `Part ${index} caption...`;
+                        textarea.addEventListener('input', (e) => {
+                            _captions[index] = e.target.value;
+                        });
+                        div.appendChild(textarea);
+
+                        captionsContainer.appendChild(div);
+                    });
+            } else {
+                captionsSection.classList.add('d-none');
+            }
+        };
+
+        const downloadCaptions = (format) => {
+            if (Object.keys(_captions).length === 0) {
+                updateLog('No captions to download.');
+                return;
+            }
+
+            let content = '';
+            let filename = 'captions';
+
+            if (format === 'txt') {
+                content = Object.entries(_captions)
+                    .sort(([a], [b]) => parseInt(a) - parseInt(b))
+                    .map(([index, text]) => `Clip ${index}: ${text}`)
+                    .join('\n');
+                filename += '.txt';
+            } else if (format === 'csv') {
+                content = "Clip Index,Caption\n" +
+                    Object.entries(_captions)
+                        .sort(([a], [b]) => parseInt(a) - parseInt(b))
+                        .map(([index, text]) => `${index},"${text.replace(/"/g, '""')}"`)
+                        .join('\n');
+                filename += '.csv';
+            }
+
+            const blob = new Blob([content], { type: `text/${format === 'csv' ? 'csv' : 'plain'};charset=utf-8;` });
+            saveAs(blob, filename); // Uses FileSaver.js
+            updateLog(`Captions downloaded as ${filename}.`);
+        };
+
+
+        // Event Listeners
+        logoX.addEventListener('input', (e) => {
+            _logoPosition.x = Number(e.target.value);
+            logoXValue.textContent = _logo.x;
+        });
+        logoY.addEventListener('input', (e) => {
+            _logoPosition.y = Number(e.target.value);
+            logoYValue.textContent = _logo.y;
+        });
+        logoSize.addEventListener('input', (e) => {
+            _logoSize = Number(e.target.value);
+            logoSizeValue.textContent = _logoSize;
+        });
+
+        textOverlayInput.addEventListener('input', (e) => {
+            _textOverlay = e.target.value;
+        });
+        textColorInput.addEventListener('input', (e) => {
+            _textColor = e.target.value;
+        });
+        fontSizeInput.addEventListener('input', (e) => {
+            _fontSize = Number(e.target.value);
+            fontSizeValue.textContent = _fontSize;
+        });
+        fontFamilyInput.addEventListener('input', (e) => {
+            _fontFamily = e.target.value;
+        });
+
+        videoFile.addEventListener('change', (event) => {
+            _videoFile = event.target.files[0];
+            if (_videoFile) {
+                const videoObjectURL = URL.createObjectURL(_videoFile);
+                videoPreview.src = videoObjectURL;
+                videoPreviewContainer.classList.remove('d-none');
+                updateLog(`Video file "${_videoFile.name}" loaded.`);
+                updateStatusMessage(`Video "${_videoFile.name}" loaded. Ready to process.`, 'success');
+                // Clear previous results
+                _downloadableClips = [];
+                _captions = {};
+                renderDownloadableClips();
+                renderCaptions();
+            } else {
+                videoPreview.src = '';
+                videoPreviewContainer.classList.add('d-none');
+                updateLog('No video file selected.');
+                updateStatusMessage('Please select a video file.', 'info');
+            }
+            startProcessingBtn.disabled = !_videoFile;
+        });
+
+        clipDurationInput.addEventListener('input', (e) => {
+            _clipDuration = Number(e.target.value);
+        });
+
+        modulationEffectSelect.addEventListener('input', (e) => {
+            _modulationEffect = e.target.value;
+        });
+
+        outputOrientationSelect.addEventListener('input', (e) => { // New event listener
+            _outputOrientation = e.target.value;
+        });
+
+        logoFile.addEventListener('change', (event) => {
+            _logoFile = event.target.files[0];
+            if (_logoFile) {
+                const logoObjectURL = URL.createObjectURL(_logoFile);
+                logoPreview.src = logoObjectURL;
+                logoPreviewContainer.classList.remove('d-none');
+                updateLog(`Logo file "${_logoFile.name}" loaded.`);
+            } else {
+                logoPreview.src = '#';
+                logoPreviewContainer.classList.add('d-none');
+                updateLog('No logo file selected.');
+            }
+        });
+
+        startProcessingBtn.addEventListener('click', async () => {
+            if (!_videoFile || _isProcessing) {
+                updateStatusMessage('Please upload a video file and ensure processing is not already ongoing.', 'error');
+                return;
+            }
+
+            setProcessingState(true);
+            updateLog('Starting video processing... This may take a while.', true); // Clear and add initial log
+            updateStatusMessage('Processing video... Please wait.', 'info');
+            updateProgressBar(0, 'Preparing...'); // Initial progress
+
+            const formData = new FormData();
+            formData.append('video', _videoFile);
+            formData.append('clipDuration', _clipDuration);
+            formData.append('modulationEffect', _modulationEffect);
+            formData.append('outputOrientation', _outputOrientation); // New: Append output orientation
+            formData.append('textOverlay', _textOverlay);
+            formData.append('textColor', _textColor);
+            formData.append('fontSize', _fontSize);
+            formData.append('fontFamily', _fontFamily);
+
+            if (_logoFile) {
+                formData.append('logo', _logoFile);
+                formData.append('logoPositionX', _logoPosition.x);
+                formData.append('logoPositionY', _logoPosition.y);
+                formData.append('logoSize', _logoSize);
+            }
+
+            try {
+                const response = await fetch(`${backendUrl}/process-video`, {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    // Display backend logs if available in error response
+                    if (errorData.logs && errorData.logs.length > 0) {
+                        errorData.logs.forEach(log => updateLog(log));
+                    }
+                    throw new Error(errorData.error || `Server error: ${response.status}`);
+                }
+
+                const result = await response.json();
+                
+                // Display all backend logs
+                if (result.logs && result.logs.length > 0) {
+                    result.logs.forEach(log => updateLog(log));
+                }
+
+                updateLog('Processing complete!');
+                updateStatusMessage('Processing complete! Clips are ready for download below.', 'success');
+                updateProgressBar(100, 'Done!'); // Final progress
+
+                _downloadableClips = result.clips.map(clip => ({
+                    clipIndex: clip.clipIndex,
+                    fileName: clip.fileName,
+                    blobUrl: clip.blobUrl,
+                    thumbnailUrl: clip.thumbnailUrl
+                }));
+
+                const newCaptions = {};
+                _downloadableClips.forEach(clip => {
+                    newCaptions[clip.clipIndex] = _captions[clip.clipIndex] || `Part ${clip.clipIndex}/${_downloadableClips.length} – Your Custom Message`;
+                });
+                _captions = newCaptions;
+
+                renderDownloadableClips();
+                renderCaptions();
+
+            } catch (error) {
+                updateLog(`An error occurred: ${error.message}. Please ensure your Node.js backend server is running at ${backendUrl} and is accessible.`);
+                updateStatusMessage(`Error: ${error.message}. Please ensure backend is running.`, 'error');
+                console.error('Frontend processing error:', error);
+                updateProgressBar(0, 'Error!'); // Reset progress on error
+            } finally {
+                setProcessingState(false);
+                // Clear input fields and previews
+                _videoFile = null;
+                _logoFile = null;
+                videoFile.value = '';
+                logoFile.value = '';
+                videoPreview.src = '';
+                videoPreviewContainer.classList.add('d-none');
+                logoPreview.src = '#';
+                logoPreviewContainer.classList.add('d-none');
+            }
+        });
+
+        downloadCaptionsTxtBtn.addEventListener('click', () => downloadCaptions('txt'));
+        downloadCaptionsCsvBtn.addEventListener('click', () => downloadCaptions('csv'));
+
+        // Initial state setup
+        setProcessingState(false);
+        updateStatusMessage('Upload a video to begin!', 'info');
+    </script>
+</body>
+</html>
+<!-- npm start  -->
